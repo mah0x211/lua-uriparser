@@ -1,11 +1,11 @@
 /*
  *  Copyright (C) 2013 Masatoshi Teruya
  *
- *  Permission is hereby granted, free of charge, to any person obtaining a 
- *  copy of this software and associated documentation files (the "Software"), 
- *  to deal in the Software without restriction, including without limitation 
- *  the rights to use, copy, modify, merge, publish, distribute, sublicense, 
- *  and/or sell copies of the Software, and to permit persons to whom the 
+ *  Permission is hereby granted, free of charge, to any person obtaining a
+ *  copy of this software and associated documentation files (the "Software"),
+ *  to deal in the Software without restriction, including without limitation
+ *  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ *  and/or sell copies of the Software, and to permit persons to whom the
  *  Software is furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -13,10 +13,10 @@
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL 
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  *  THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
- *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  *  DEALINGS IN THE SOFTWARE.
  *
  *  luriparser.c
@@ -88,11 +88,11 @@ static int parse_query( lua_State *L, const char *str, size_t len )
     UriQueryListA *qry = NULL;
     int nqry = 0;
     int rc = uriDissectQueryMallocA( &qry, &nqry, str, str + len );
-    
+
     if( rc == URI_SUCCESS )
     {
         UriQueryListA *ptr = qry;
-        
+
         lua_newtable( L );
         while( ptr )
         {
@@ -103,7 +103,7 @@ static int parse_query( lua_State *L, const char *str, size_t len )
         }
         uriFreeQueryListA( qry );
     }
-    
+
     return rc;
 }
 
@@ -116,13 +116,13 @@ static int parse_lua( lua_State *L )
     UriParserStateA state;
     UriUriA uri;
     int rc = 0;
-    
+
     // check arguments
     if( !lua_isnoneornil( L, 2 ) ){
         luaL_checktype( L, 2, LUA_TBOOLEAN );
         parseQry = lua_toboolean( L, 2 );
     }
-    
+
     // parse
     state.uri = &uri;
     rc = uriParseUriA( &state, url );
@@ -130,55 +130,56 @@ static int parse_lua( lua_State *L )
     {
         const char *pathHead = url;
         const char *pathTail = url + len;
+
         // create table
         lua_newtable( L );
-        
+
         // set absolutePath
         lstate_bool2tbl( L, "absolutePath", uri.absolutePath );
         // set scheme
         if( uri.scheme.first ){
-            lstate_strn2tbl( L, "scheme", uri.scheme.first, 
+            lstate_strn2tbl( L, "scheme", uri.scheme.first,
                              uri.scheme.afterLast - uri.scheme.first );
         }
         // set userInfo
         if( uri.userInfo.first ){
-            lstate_strn2tbl( L, "userinfo", uri.userInfo.first, 
+            lstate_strn2tbl( L, "userinfo", uri.userInfo.first,
                              uri.userInfo.afterLast - uri.userInfo.first );
         }
         // set hostText
         if( (uintptr_t)uri.hostText.first >= (uintptr_t)url &&
             (uintptr_t)uri.hostText.first <= (uintptr_t)pathTail ){
             pathHead = uri.hostText.afterLast;
-            lstate_strn2tbl( L, "host", uri.hostText.first, 
+            lstate_strn2tbl( L, "host", uri.hostText.first,
                              uri.hostText.afterLast - uri.hostText.first );
         }
         // set portText
         if( uri.portText.first ){
             pathHead = uri.portText.afterLast;
-            lstate_strn2tbl( L, "port", uri.portText.first, 
+            lstate_strn2tbl( L, "port", uri.portText.first,
                              uri.portText.afterLast - uri.portText.first );
         }
-        
+
         // set fragment
         if( uri.fragment.first ){
             pathTail = uri.fragment.first - 1;
-            lstate_strn2tbl( L, "fragment", uri.fragment.first, 
+            lstate_strn2tbl( L, "fragment", uri.fragment.first,
                              uri.fragment.afterLast - uri.fragment.first );
         }
-        
+
         // set query
         if( uri.query.first )
         {
             pathTail = uri.query.first - 1;
             // no query parse
             if( !parseQry ){
-                lstate_strn2tbl( L, "query", uri.query.first, 
+                lstate_strn2tbl( L, "query", uri.query.first,
                                  uri.query.afterLast - uri.query.first );
             }
             else
             {
                 lua_pushstring( L, "query" );
-                rc = parse_query( L, uri.query.first, 
+                rc = parse_query( L, uri.query.first,
                                   uri.query.afterLast - uri.query.first );
                 if( rc == URI_SUCCESS ){
                     lua_rawset( L, -3 );
@@ -191,7 +192,7 @@ static int parse_lua( lua_State *L )
                 }
             }
         }
-        
+
         // set path
         if( (uintptr_t)pathHead < (uintptr_t)pathTail ){
             lstate_strn2tbl( L, "path", pathHead, pathTail - pathHead );
@@ -199,18 +200,18 @@ static int parse_lua( lua_State *L )
         else {
             lstate_strn2tbl( L, "path", "/", 1 );
         }
-        
+
         // free
         uriFreeUriMembersA( &uri );
-        
+
         return 1;
     }
-    
+
 PARSE_FAILURE:
     // got error
     lua_pushnil( L );
     lstate_pusherr( L, rc );
-    
+
     return 2;
 }
 
@@ -220,16 +221,16 @@ static int parse_query_lua( lua_State *L )
     size_t len = 0;
     const char *qry = luaL_checklstring( L, 1, &len );
     int rc = parse_query( L, qry, len );
-    
+
     // success
     if( rc == URI_SUCCESS ){
         return 1;
     }
-    
+
     // got error
     lua_pushnil( L );
     lstate_pusherr( L, rc );
-    
+
     return 2;
 }
 
@@ -251,7 +252,7 @@ LUALIB_API int luaopen_uriparser( lua_State *L )
         lua_rawset( L, -3 );
         ptr++;
     }
-    
+
     return 1;
 }
 
