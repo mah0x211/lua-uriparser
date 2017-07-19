@@ -125,17 +125,12 @@ static int parse_lua( lua_State *L )
 
     // parse
     state.uri = &uri;
-    rc = uriParseUriA( &state, url );
-    if( rc == URI_SUCCESS )
+    if( ( rc = uriParseUriExA( &state, url, url + len ) ) == URI_SUCCESS &&
+        ( rc = uriNormalizeSyntaxA( &uri ) ) == URI_SUCCESS )
     {
-        const char *pathHead = url;
-        const char *pathTail = url + len;
-
         // create table
         lua_newtable( L );
 
-        // set absolutePath
-        lstate_bool2tbl( L, "absolutePath", uri.absolutePath );
         // set scheme
         if( uri.scheme.first ){
             lstate_strn2tbl( L, "scheme", uri.scheme.first,
@@ -147,22 +142,18 @@ static int parse_lua( lua_State *L )
                              uri.userInfo.afterLast - uri.userInfo.first );
         }
         // set hostText
-        if( (uintptr_t)uri.hostText.first >= (uintptr_t)url &&
-            (uintptr_t)uri.hostText.first <= (uintptr_t)pathTail ){
-            pathHead = uri.hostText.afterLast;
+        if( uri.hostText.first ){
             lstate_strn2tbl( L, "host", uri.hostText.first,
                              uri.hostText.afterLast - uri.hostText.first );
         }
         // set portText
         if( uri.portText.first ){
-            pathHead = uri.portText.afterLast;
             lstate_strn2tbl( L, "port", uri.portText.first,
                              uri.portText.afterLast - uri.portText.first );
         }
 
         // set fragment
         if( uri.fragment.first ){
-            pathTail = uri.fragment.first - 1;
             lstate_strn2tbl( L, "fragment", uri.fragment.first,
                              uri.fragment.afterLast - uri.fragment.first );
         }
@@ -170,7 +161,6 @@ static int parse_lua( lua_State *L )
         // set query
         if( uri.query.first )
         {
-            pathTail = uri.query.first - 1;
             // no query parse
             if( !parseQry ){
                 lstate_strn2tbl( L, "query", uri.query.first,
@@ -194,11 +184,31 @@ static int parse_lua( lua_State *L )
         }
 
         // set path
-        if( (uintptr_t)pathHead < (uintptr_t)pathTail ){
-            lstate_strn2tbl( L, "path", pathHead, pathTail - pathHead );
+        lua_pushliteral( L, "path" );
+        if( uri.pathHead && uri.pathHead->text.first )
+        {
+            UriPathSegmentA *seg = uri.pathHead;
+            int top = lua_gettop( L );
+
+            while( seg && seg->text.first != seg->text.afterLast ){
+                lua_pushliteral( L, "/" );
+                lua_pushlstring(
+                    L, seg->text.first, seg->text.afterLast - seg->text.first
+                );
+                seg = seg->next;
+            }
+
+            // push trailing-slash
+            if( uri.pathTail->text.first == uri.pathTail->text.afterLast ){
+                lua_pushliteral( L, "/" );
+            }
+
+            lua_concat( L, lua_gettop( L ) - top );
+            lua_rawset( L, -3 );
         }
         else {
-            lstate_strn2tbl( L, "path", "/", 1 );
+            lua_pushliteral( L, "/" );
+            lua_rawset( L, -3 );
         }
 
         // free
